@@ -12,6 +12,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS audit_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            client_id TEXT,
             product_name TEXT,
             tied_capital REAL,
             days_of_stock REAL,
@@ -23,34 +24,35 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_audit(product_name, tied_capital, days_of_stock, margin_percent, status, recommendation):
+def save_audit(client_id, product_name, tied_capital, days_of_stock, margin_percent, status, recommendation):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO audit_history 
-        (product_name, tied_capital, days_of_stock, margin_percent, status, recommendation)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (product_name, tied_capital, days_of_stock, margin_percent, status, recommendation))
+        (client_id, product_name, tied_capital, days_of_stock, margin_percent, status, recommendation)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (client_id, product_name, tied_capital, days_of_stock, margin_percent, status, recommendation))
     conn.commit()
     conn.close()
 
-def get_audits():
+def get_client_audits(client_id):
     conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT * FROM audit_history ORDER BY timestamp DESC", conn)
+    df = pd.read_sql_query(
+        "SELECT timestamp, product_name, tied_capital, days_of_stock, margin_percent, status, recommendation FROM audit_history WHERE client_id = ? ORDER BY timestamp DESC", 
+        conn, params=(client_id,)
+    )
     conn.close()
     return df
 
-# Initialize database
 init_db()
 
-# --- ENHANCED RISK ENGINE ---
+# --- ANALYSIS ENGINE ---
 def analyze_inventory_item(purchase_price, selling_price, current_stock, recent_sales, analysis_period):
     tied_capital = current_stock * purchase_price
     daily_sales = recent_sales / analysis_period if analysis_period > 0 else 0
     days_of_stock = current_stock / daily_sales if daily_sales > 0 else 999
     margin = ((selling_price - purchase_price) / selling_price * 100) if selling_price > 0 else 0
 
-    # Decision Matrix
     if selling_price < purchase_price:
         status = "🔴 SEVERE LOSS"
         action = "Stop sales immediately. Item is priced below cost."
@@ -72,16 +74,42 @@ def analyze_inventory_item(purchase_price, selling_price, current_stock, recent_
         "action": action
     }
 
-# --- STREAMLIT UI ---
-st.set_page_config(page_title="LossGuard v0.2", page_icon="🛡️", layout="wide")
-st.title("🛡️ LossGuard Intelligence Engine")
+# --- PAGE CONFIG & SESSION ---
+st.set_page_config(page_title="LossGuard Public Beta", page_icon="🛡️", layout="wide")
 
-tab1, tab2, tab3 = st.tabs(["🔍 Single Product Audit", "📊 CSV Batch Audit", "📜 Saved Audit Logs"])
+if "client_id" not in st.session_state:
+    st.session_state.client_id = None
 
-# TAB 1: SINGLE PRODUCT AUDIT
-with tab1:
-    st.subheader("Manual Inventory Risk Assessment")
+# --- CLIENT PORTAL LANDING SCREEN ---
+if not st.session_state.client_id:
+    st.title("🛡️ Welcome to LossGuard")
+    st.write("Free Inventory Intelligence & Capital Trap Detector for Retailers & E-commerce Stores.")
     
+    st.subheader("Start Your Audit Session")
+    user_input = st.text_input("Enter your Store Name or Business Email to start:", placeholder="e.g. Lagos Auto Parts or store@domain.com")
+    
+    if st.button("Launch Inventory Workspace"):
+        if user_input.strip():
+            st.session_state.client_id = user_input.strip().lower()
+            st.rerun()
+        else:
+            st.error("Please enter a valid store name or email to continue.")
+    st.stop()
+
+# --- MAIN CLIENT WORKSPACE ---
+st.sidebar.title("🛡️ LossGuard Workspace")
+st.sidebar.write(f"Logged in as: **{st.session_state.client_id}**")
+if st.sidebar.button("Switch Store / Exit"):
+    st.session_state.client_id = None
+    st.rerun()
+
+st.title("🛡️ LossGuard Inventory Engine")
+
+tab1, tab2, tab3 = st.tabs(["🔍 Single Product Audit", "📊 CSV Batch Audit", "📜 My Audit History"])
+
+# TAB 1: SINGLE ITEM
+with tab1:
+    st.subheader("Manual Item Assessment")
     col1, col2 = st.columns(2)
     with col1:
         p_name = st.text_input("Product Name", "Engine Oil 5L")
@@ -92,29 +120,26 @@ with tab1:
         recent_sales = st.number_input("Recent Sales (Units)", min_value=0, value=15)
         analysis_period = st.number_input("Analysis Period (Days)", min_value=1, value=30)
 
-    if st.button("Run Audit & Log Result"):
-        result = analyze_inventory_item(purchase_price, selling_price, current_stock, recent_sales, analysis_period)
+    if st.button("Run Audit"):
+        res = analyze_inventory_item(purchase_price, selling_price, current_stock, recent_sales, analysis_period)
+        save_audit(st.session_state.client_id, p_name, res["tied_capital"], res["days_of_stock"], res["margin"], res["status"], res["action"])
         
-        save_audit(p_name, result["tied_capital"], result["days_of_stock"], result["margin"], result["status"], result["action"])
-        st.success(f"Audit logged to SQLite database!")
-
-        st.metric("Tied Capital", f"₦{result['tied_capital']:,.2f}")
+        st.success("Audit complete and saved to your history!")
+        st.metric("Tied Capital", f"₦{res['tied_capital']:,.2f}")
         
-        if "🔴" in result["status"]:
-            st.error(f"Status: {result['status']}")
-        elif "🟡" in result["status"]:
-            st.warning(f"Status: {result['status']}")
-        else:
-            st.success(f"Status: {result['status']}")
+        if "🔴" in res["status"]: st.error(f"Status: {res['status']}")
+        elif "🟡" in res["status"]: st.warning(f"Status: {res['status']}")
+        else: st.success(f"Status: {res['status']}")
             
-        st.write(f"**Stock Coverage:** ~{int(result['days_of_stock'])} days remaining")
-        st.write(f"**Margin:** {result['margin']:.1f}%")
-        st.write(f"**Action Plan:** {result['action']}")
+        st.write(f"**Stock Coverage:** ~{int(res['days_of_stock'])} days remaining")
+        st.write(f"**Margin:** {res['margin']:.1f}%")
+        st.write(f"**Recommended Action:** {res['action']}")
 
-# TAB 2: BATCH CSV AUDIT
+# TAB 2: BATCH CSV
 with tab2:
-    st.subheader("Batch CSV Inventory Audit")
-    uploaded_file = st.file_uploader("Upload Store CSV", type=["csv"])
+    st.subheader("Upload Store Inventory CSV")
+    st.caption("Required CSV columns: Product, Purchase_Price, Selling_Price, Current_Stock, Recent_Sales, Analysis_Period")
+    uploaded_file = st.file_uploader("Choose CSV File", type=["csv"])
 
     if uploaded_file is not None:
         try:
@@ -128,29 +153,33 @@ with tab2:
                         row['Purchase_Price'], row['Selling_Price'], 
                         row['Current_Stock'], row['Recent_Sales'], row['Analysis_Period']
                     )
-                    save_audit(row['Product'], res['tied_capital'], res['days_of_stock'], res['margin'], res['status'], res['action'])
+                    save_audit(st.session_state.client_id, row['Product'], res['tied_capital'], res['days_of_stock'], res['margin'], res['status'], res['action'])
                     results.append(res)
                 
                 res_df = pd.DataFrame(results)
                 df['Status'] = res_df['status']
-                df['Tied_Capital'] = res_df['tied_capital']
+                df['Tied_Capital (₦)'] = res_df['tied_capital']
                 df['Days_Of_Stock'] = res_df['days_of_stock']
-                df['Margin_%'] = res_df['margin']
+                df['Action_Plan'] = res_df['action']
                 
-                st.write("### Batch Analysis Output")
-                st.dataframe(df[['Product', 'Status', 'Tied_Capital', 'Days_Of_Stock', 'Margin_%']], use_container_width=True)
-                st.success("All items from CSV saved to database.")
+                st.write("### Batch Analysis Results")
+                st.dataframe(df[['Product', 'Status', 'Tied_Capital (₦)', 'Days_Of_Stock', 'Action_Plan']], use_container_width=True)
+                
+                # Allow CSV Export
+                csv_data = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download Audit Report (CSV)", csv_data, "lossguard_audit_report.csv", "text/csv")
             else:
-                st.error(f"CSV must contain headers: {', '.join(req_cols)}")
+                st.error(f"CSV format invalid. Please ensure columns match: {', '.join(req_cols)}")
         except Exception as e:
             st.error(f"Error processing CSV: {e}")
 
-# TAB 3: SAVED AUDIT LOGS
+# TAB 3: CLIENT HISTORY
 with tab3:
-    st.subheader("Persistent SQLite Audit Records")
-    audits_df = get_audits()
-    if not audits_df.empty:
-        st.dataframe(audits_df, use_container_width=True)
+    st.subheader(f"Audit History for {st.session_state.client_id}")
+    history_df = get_client_audits(st.session_state.client_id)
+    if not history_df.empty:
+        st.dataframe(history_df, use_container_width=True)
+        csv_history = history_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Export History to CSV", csv_history, "audit_history.csv", "text/csv")
     else:
-        st.info("No audit records found in SQLite database yet.")
-                   
+        st.info("No saved audits found for your workspace. Run a single product or CSV batch audit to get started.")
