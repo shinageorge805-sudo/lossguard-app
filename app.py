@@ -1,4 +1,127 @@
-import streamlit as st
+    if st.button("Run Financial Audit"):
+        res = compute_institutional_metrics(purchase_price, selling_price, current_stock, recent_sales, analysis_period)
+        save_audit(
+            st.session_state.client_id, p_name, res["tied_capital"], res["days_of_stock"], 
+            res["margin_pct"], res["irvs_score"], res["status"], res["opt_conservative"]
+        )
+        
+        st.success("Financial Risk & Liquidation Assessment Complete")
+        st.write("---")
+        
+        # TOP METRIC DASHBOARD
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("💰 Cash Locked in Stock", f"₦{res['tied_capital']:,.2f}")
+        col_b.metric("⚠️ Risk Velocity Score", f"{res['irvs_score']} / 100")
+        col_c.metric("💸 Projected Holding Loss", f"₦{res['carrying_cost']:,.2f}")
+        
+        st.write("---")
+        
+        # STATUS BADGE
+        if "🔴" in res["status"]: 
+            st.error(f"**Classification:** {res['status']}")
+        elif "🟡" in res["status"]: 
+            st.warning(f"**Classification:** {res['status']}")
+        else: 
+            st.success(f"**Classification:** {res['status']}")
+            
+        # SECTION 1: DETAILED FINANCIAL IMPACT
+        st.subheader("📊 Financial & Operational Impact")
+        st.write(f"• **Stock Run-out Projection:** ~{int(res['days_of_stock'])} days remaining based on recent velocity.")
+        st.write(f"• **Unit Profitability:** {res['margin_pct']:.1f}% gross margin.")
+        
+        st.info(res["impact_analysis"])
+        
+        # SECTION 2: MULTI-TIERED ACTION PLAN
+        st.subheader("💡 Strategic Capital Recovery Roadmap")
+        st.write("Choose the liquidation or optimization strategy that best aligns with your business goals:")
+        
+        with st.expander("🛡️ **Option 1: Conservative Strategy (Protect Margins)**", expanded=True):
+            st.markdown(res["opt_conservative"])
+            
+        with st.expander("⚡ **Option 2: Aggressive Strategy (Fast Cash Recovery)**", expanded=True):
+            st.markdown(res["opt_aggressive"])
+            
+        with st.expander("🎨 **Option 3: Creative Strategy (Volume & Bundling)**", expanded=True):
+            st.markdown(res["opt_creative"])
+                                              def compute_institutional_metrics(purchase_price, selling_price, current_stock, recent_sales, analysis_period, capital_cost_apr=0.25):
+    # Core calculations
+    tied_capital = current_stock * purchase_price
+    daily_sales_velocity = recent_sales / analysis_period if analysis_period > 0 else 0
+    days_of_stock = current_stock / daily_sales_velocity if daily_sales_velocity > 0 else 999
+    
+    margin_amt = selling_price - purchase_price
+    gross_margin_pct = (margin_amt / selling_price * 100) if selling_price > 0 else 0
+    
+    # Capital Carrying Cost Decay Model (Compounded APR)
+    daily_rate = capital_cost_apr / 365
+    carrying_cost_exposure = tied_capital * (((1 + daily_rate)**min(days_of_stock, 365)) - 1)
+
+    # Multi-variable Inventory Risk Velocity Score (0-100)
+    velocity_risk = min(100.0, (days_of_stock / 180.0) * 100.0)
+    margin_risk = max(0.0, 100.0 - gross_margin_pct) if gross_margin_pct > 0 else 100.0
+    irvs_score = round((0.65 * velocity_risk) + (0.35 * margin_risk), 1)
+
+    # Strategy Formulations
+    breakeven_clearance = purchase_price * 1.02  # 2% recovery buffer
+    half_stock_units = int(current_stock / 2)
+    bundle_target_price = (purchase_price * 2) * 1.05  # Bundle 2 units with minor margin
+
+    if selling_price < purchase_price:
+        status = "🔴 CRITICAL: NEGATIVE MARGIN DRAIN"
+        impact_analysis = (
+            f"You are currently losing ₦{abs(margin_amt):,.2f} on every single unit sold. "
+            f"Across your remaining stock of {current_stock:,} units, this product will bleed "
+            f"₦{(abs(margin_amt) * current_stock):,.2f} directly out of your working capital."
+        )
+        opt_conservative = f"**Immediate Repricing:** Raise the price to at least ₦{(purchase_price * 1.15):,.2f} to secure a baseline 15% operating margin."
+        opt_aggressive = f"**Supplier Return / Exchange:** Halt all sales immediately and request a supplier return or credit exchange based on cost-of-goods distortion."
+        opt_creative = f"**Loss-Leader Bundling:** Pair 1 unit of this item with a high-margin (>50%) fast-moving product to mask a re-adjusted bundle price."
+
+    elif irvs_score >= 70 or days_of_stock > 90:
+        status = "🔴 CAPITAL TRAP (SEVERE OVERSTOCK)"
+        impact_analysis = (
+            f"You have **₦{tied_capital:,.2f}** in cash completely frozen in this product line. "
+            f"At your current speed of sales ({daily_sales_velocity:.1f} units/day), it will take roughly "
+            f"**{int(days_of_stock)} days** to liquidate this inventory naturally. Over that time, storage costs, "
+            f"capital inflation, and opportunity cost will erase **₦{carrying_cost_exposure:,.2f}** in store value."
+        )
+        opt_conservative = f"**Targeted Clearance Sale:** Discount the unit price to **₦{breakeven_clearance:,.2f}** (2% above cost) to recover **₦{(breakeven_clearance * current_stock):,.2f}** in liquid cash within 14 days."
+        opt_aggressive = f"**Bulk Liquidation / B2B Offloading:** Offer {half_stock_units:,} units (50% of stock) at wholesale cost (₦{purchase_price:,.2f}/unit) to rival merchants or regional distributors to immediately unlock ₦{(half_stock_units * purchase_price):,.2f}."
+        opt_creative = f"**2-for-1 Value Bundles:** Create a 'Buy One, Get One at 50% Off' campaign. This effectively sells 2 units at ₦{(selling_price * 1.5):,.2f}, clearing inventory twice as fast while keeping cash flow positive."
+
+    elif irvs_score >= 40:
+        status = "🟡 MODERATE RISK (VELOCITY SLOWDOWN)"
+        impact_analysis = (
+            f"Your inventory is moving slower than optimal cycles, with roughly **{int(days_of_stock)} days** of stock remaining. "
+            f"While not currently losing cash, this stock is tying up **₦{tied_capital:,.2f}** that could be reinvested into faster-moving merchandise."
+        )
+        opt_conservative = f"**Freeze Purchase Orders:** Do not issue new POs for this item until stock coverage drops below 25 days."
+        opt_aggressive = f"**Promotional Push:** Offer a temporary 10% discount or add free delivery to boost daily sales velocity."
+        opt_creative = f"**Cross-Selling Incentive:** Recommend this item as a checkout add-on for orders exceeding ₦50,000."
+
+    else:
+        status = "🟢 HEALTHY CAPITAL EFFICIENCY"
+        impact_analysis = (
+            f"This product is operating at optimal parameters with a healthy **{gross_margin_pct:.1f}% profit margin** "
+            f"and a manageable **~{int(days_of_stock)} days** of supply."
+        )
+        opt_conservative = "**Maintain Standard Cycles:** Continue standard reorder intervals based on historical demand."
+        opt_aggressive = "**Volume Expansion:** Negotiate a 5% bulk purchase discount from your supplier on the next purchase order."
+        opt_creative = "**VIP Early Access:** Feature this product in exclusive promotions for high-value repeat buyers."
+
+    return {
+        "tied_capital": tied_capital,
+        "days_of_stock": days_of_stock,
+        "margin_pct": gross_margin_pct,
+        "irvs_score": irvs_score,
+        "carrying_cost": carrying_cost_exposure,
+        "status": status,
+        "impact_analysis": impact_analysis,
+        "opt_conservative": opt_conservative,
+        "opt_aggressive": opt_aggressive,
+        "opt_creative": opt_creative
+    }
+    import streamlit as st
 import pandas as pd
 import sqlite3
 
