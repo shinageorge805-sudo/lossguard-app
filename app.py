@@ -1,24 +1,4 @@
-Unchecked inventory and POS\n"
-        "mismatches cost retail stores\n"
-        "thousands every month."
-    )
-    draw.multiline_text(
-        (width // 2, int(height * 0.83)),
-        body_text,
-        font=font_body,
-        fill=(240, 240, 240, 255),
-        align="center",
-        anchor="mm",
-    )
-
-    # --- 3. Footer Call To Action ---
-    footer_text = "(Tap to see how to fix it ➡️)"
-    draw.text(
-        (width // 2, int(height * 0.94)),
-        footer_text,
-        font=font_footer,
-        fill=(200, 200, 200, 255),
-        anchor="mm",
+import streamlit as st
 import pandas as pd
 import sqlite3
 import hmac
@@ -121,21 +101,21 @@ def compute_institutional_metrics(purchase_price, selling_price, current_stock, 
 
     if selling_price < purchase_price:
         status = "🔴 CRITICAL: NEGATIVE MARGIN DRAIN"
-        impact_analysis = f"Hello! 👋 We detected a major profitability issue here. You are currently losing ₦{abs(margin_amt):,.2f} on every unit sold. Across your full stock of {current_stock:,} units, this item will drain ₦{(abs(margin_amt) * current_stock):,.2f} directly from your store cash flow."
+        impact_analysis = f"Hello! 👋 Unchecked inventory and POS mismatches cost retail stores thousands every month. You are currently losing ₦{abs(margin_amt):,.2f} on every unit sold. Across your full stock of {current_stock:,} units, this item will drain ₦{(abs(margin_amt) * current_stock):,.2f} directly from your store cash flow."
         opt_conservative = f"**Option 1: Margin Protection Price Increase**\n\n• **Action:** Adjust retail selling price to ₦{(purchase_price * 1.15):,.2f} minimum.\n• **Why:** Reclaims cost of goods and guarantees a healthy 15% profit margin on each sale."
         opt_aggressive = "**Option 2: Immediate Supplier Dispute / Exchange**\n\n• **Action:** Freeze active sales immediately and request a credit note or stock replacement from your supplier.\n• **Why:** Stops ongoing capital loss caused by cost price distortions."
         opt_creative = "**Option 3: Loss-Leader Bundle Strategy**\n\n• **Action:** Pair 1 unit with a fast-moving, high-margin product (>50% margin).\n• **Why:** Disguises the necessary price adjustment within an attractive value bundle while maintaining overall store profitability."
 
     elif irvs_score >= 70 or days_of_stock > 90:
         status = "🔴 CAPITAL TRAP (SEVERE OVERSTOCK)"
-        impact_analysis = f"Welcome to your risk breakdown! 👋 You currently have ₦{tied_capital:,.2f} in cash locked up in this product line. At your current sales rate ({daily_sales_velocity:.1f} units per day), it will take about {int(days_of_stock)} days to sell out naturally. Holding this inventory for so long will cause carrying fees, inflation, and opportunity costs to eat away ₦{carrying_cost_exposure:,.2f} of your capital."
+        impact_analysis = f"Welcome to your risk breakdown! 👋 Unchecked inventory and POS mismatches cost retail stores thousands every month. You currently have ₦{tied_capital:,.2f} in cash locked up in this product line. At your current sales rate ({daily_sales_velocity:.1f} units per day), it will take about {int(days_of_stock)} days to sell out naturally. Holding this inventory for so long will cause carrying fees, inflation, and opportunity costs to eat away ₦{carrying_cost_exposure:,.2f} of your capital."
         opt_conservative = f"**Option 1: Controlled Clearance Promotion**\n\n• **Target Price:** ₦{breakeven_clearance:,.2f} per unit (2% above cost price).\n• **Cash Recovery:** Recovers ₦{(breakeven_clearance * current_stock):,.2f} in liquid cash within 14 days.\n• **Why:** Safely liquidates slow stock without taking a net loss."
         opt_aggressive = f"**Option 2: Wholesale B2B Cash Offload**\n\n• **Target Volume:** Sell {half_stock_units:,} units (50% of stock) at cost price (₦{purchase_price:,.2f}/unit).\n• **Cash Recovery:** Unlocks ₦{(half_stock_units * purchase_price):,.2f} instantly.\n• **Why:** Provides immediate cash to buy faster-moving inventory."
         opt_creative = f"**Option 3: Buy 1, Get 1 at 50% Off Bundle**\n\n• **Target Structure:** Offer a 'Buy 1, Get 1 at Half Price' deal.\n• **Why:** Effectively sells 2 units at ₦{(selling_price * 1.5):,.2f}, doubling sales speed while preserving positive margins."
 
     elif irvs_score >= 40:
         status = "🟡 MODERATE RISK (VELOCITY SLOWDOWN)"
-        impact_analysis = f"Hi there! 👋 Your inventory velocity is running slightly slower than optimal cycles, with ~{int(days_of_stock)} days of stock remaining. While you are making profit on sales, you have ₦{tied_capital:,.2f} tied up that could be earning faster returns elsewhere."
+        impact_analysis = f"Hi there! 👋 Unchecked inventory and POS mismatches cost retail stores thousands every month. Your inventory velocity is running slightly slower than optimal cycles, with ~{int(days_of_stock)} days of stock remaining. While you are making profit on sales, you have ₦{tied_capital:,.2f} tied up that could be earning faster returns elsewhere."
         opt_conservative = "**Option 1: Pause Purchase Orders**\n\n• **Action:** Freeze new stock replenishment until remaining coverage drops below 25 days.\n• **Why:** Allows existing stock to clear naturally before committing fresh cash."
         opt_aggressive = "**Option 2: Flash Promotion Boost**\n\n• **Action:** Launch a temporary 10% discount or offer free delivery.\n• **Why:** Re-engages buyers and accelerates daily turnover."
         opt_creative = "**Option 3: Checkout Add-On Feature**\n\n• **Action:** Offer this item as a recommended add-on for customer purchases over ₦50,000.\n• **Why:** Boosts average basket sizes without requiring broad discount campaigns."
@@ -171,7 +151,8 @@ if "client_id" not in st.session_state:
 # LANDING PAGE
 if not st.session_state.client_id:
     st.title("🛡️ Welcome to LossGuard")
-    st.write("Institutional Financial Risk Engine, Moniepoint POS Integration & Theft Detection Hub.")
+    st.warning("🚨 **Is your store leaking cash?** Unchecked inventory and POS mismatches cost retail stores thousands every month.")
+    st.write("LossGuard provides an Institutional Financial Risk Engine, Moniepoint POS Integration & Theft Detection Hub.")
     
     user_input = st.text_input("Enter Merchant ID or Store Name:", placeholder="e.g. lagos_auto_hub")
     if st.button("Access Store Workspace"):
@@ -192,6 +173,7 @@ if st.sidebar.button("Switch Store / Logout"):
     st.rerun()
 
 st.title("🛡️ LossGuard Intelligent Business Protection")
+st.caption("🚨 **Alert:** Unchecked inventory and POS mismatches cost retail stores thousands every month.")
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "💳 Live Moniepoint POS Audit", 
@@ -364,3 +346,4 @@ with tab4:
         st.download_button("📥 Download Audit Stream (CSV)", csv_history, "audit_history.csv", "text/csv")
     else:
         st.info("No recorded logs found in this workspace. Run an audit to populate history.")
+        
