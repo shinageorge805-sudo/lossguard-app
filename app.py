@@ -13,8 +13,6 @@ DB_NAME = "lossguard.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    
-    # Audit history table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS audit_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,8 +27,6 @@ def init_db():
             recommendation TEXT
         )
     """)
-    
-    # Moniepoint live transaction ledger
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS moniepoint_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,12 +53,7 @@ def record_moniepoint_transaction(client_id, tx_ref, product_name, units_sold, a
 
 def get_moniepoint_sales_summary(client_id, product_name, days_window=30):
     conn = sqlite3.connect(DB_NAME)
-    query = """
-        SELECT SUM(units_sold) as total_units 
-        FROM moniepoint_transactions 
-        WHERE client_id = ? AND product_name = ? 
-        AND timestamp >= datetime('now', '-' || ? || ' days')
-    """
+    query = "SELECT SUM(units_sold) as total_units FROM moniepoint_transactions WHERE client_id = ? AND product_name = ? AND timestamp >= datetime('now', '-' || ? || ' days')"
     df = pd.read_sql_query(query, conn, params=(client_id, product_name, days_window))
     conn.close()
     units = df['total_units'].iloc[0]
@@ -81,14 +72,10 @@ def save_audit(client_id, product_name, tied_capital, days_of_stock, margin_perc
 
 def get_client_audits(client_id):
     conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query(
-        "SELECT timestamp, product_name, tied_capital, days_of_stock, margin_percent, irvs_score, status, recommendation FROM audit_history WHERE client_id = ? ORDER BY timestamp DESC", 
-        conn, params=(client_id,)
-    )
+    df = pd.read_sql_query("SELECT timestamp, product_name, tied_capital, days_of_stock, margin_percent, irvs_score, status, recommendation FROM audit_history WHERE client_id = ? ORDER BY timestamp DESC", conn, params=(client_id,))
     conn.close()
     return df
 
-# Initialize DB on load
 init_db()
 
 # ==========================================
@@ -114,42 +101,28 @@ def compute_institutional_metrics(purchase_price, selling_price, current_stock, 
 
     if selling_price < purchase_price:
         status = "🔴 CRITICAL: NEGATIVE MARGIN DRAIN"
-        impact_analysis = (
-            f"Hello! 👋 We detected a major profitability issue here. You are currently losing **₦{abs(margin_amt):,.2f}** on every unit sold. "
-            f"Across your full stock of **{current_stock:,} units**, this item will drain **₦{(abs(margin_amt) * current_stock):,.2f}** directly from your store cash flow. "
-            f"This requires an immediate pricing review to protect your business."
-        )
-        opt_conservative = f"**Option 1: Margin Protection Price Increase**\n\n• **Action:** Adjust retail selling price to **₦{(purchase_price * 1.15):,.2f}** minimum.\n• **Why:** Reclaims cost of goods and guarantees a healthy 15% profit margin on each sale."
-        opt_aggressive = f"**Option 2: Immediate Supplier Dispute / Exchange**\n\n• **Action:** Freeze active sales immediately and request a credit note or stock replacement from your supplier.\n• **Why:** Stops ongoing capital loss caused by cost price distortions."
-        opt_creative = f"**Option 3: Loss-Leader Bundle Strategy**\n\n• **Action:** Pair 1 unit with a fast-moving, high-margin product (>50% margin).\n• **Why:** Disguises the necessary price adjustment within an attractive value bundle while maintaining overall store profitability."
+        impact_analysis = f"Hello! 👋 We detected a major profitability issue here. You are currently losing ₦{abs(margin_amt):,.2f} on every unit sold. Across your full stock of {current_stock:,} units, this item will drain ₦{(abs(margin_amt) * current_stock):,.2f} directly from your store cash flow."
+        opt_conservative = f"**Option 1: Margin Protection Price Increase**\n\n• **Action:** Adjust retail selling price to ₦{(purchase_price * 1.15):,.2f} minimum.\n• **Why:** Reclaims cost of goods and guarantees a healthy 15% profit margin on each sale."
+        opt_aggressive = "**Option 2: Immediate Supplier Dispute / Exchange**\n\n• **Action:** Freeze active sales immediately and request a credit note or stock replacement from your supplier.\n• **Why:** Stops ongoing capital loss caused by cost price distortions."
+        opt_creative = "**Option 3: Loss-Leader Bundle Strategy**\n\n• **Action:** Pair 1 unit with a fast-moving, high-margin product (>50% margin).\n• **Why:** Disguises the necessary price adjustment within an attractive value bundle while maintaining overall store profitability."
 
     elif irvs_score >= 70 or days_of_stock > 90:
         status = "🔴 CAPITAL TRAP (SEVERE OVERSTOCK)"
-        impact_analysis = (
-            f"Welcome to your risk breakdown! 👋 You currently have **₦{tied_capital:,.2f}** in cash locked up in this product line. "
-            f"At your current sales rate (**{daily_sales_velocity:.1f} units per day**), it will take about **{int(days_of_stock)} days** to sell out naturally. "
-            f"Holding this inventory for so long will cause storage fees, inflation, and opportunity costs to eat away **₦{carrying_cost_exposure:,.2f}** of your capital."
-        )
-        opt_conservative = f"**Option 1: Controlled Clearance Promotion**\n\n• **Target Price:** **₦{breakeven_clearance:,.2f}** per unit (2% above cost price).\n• **Cash Recovery:** Recovers **₦{(breakeven_clearance * current_stock):,.2f}** in liquid cash within 14 days.\n• **Why:** Safely liquidates slow stock without taking a net loss."
-        opt_aggressive = f"**Option 2: Wholesale B2B Cash Offload**\n\n• **Target Volume:** Sell **{half_stock_units:,} units** (50% of stock) at cost price (**₦{purchase_price:,.2f}/unit**).\n• **Cash Recovery:** Unlocks **₦{(half_stock_units * purchase_price):,.2f}** instantly.\n• **Why:** Provides immediate cash to buy faster-moving inventory."
-        opt_creative = f"**Option 3: Buy 1, Get 1 at 50% Off Bundle**\n\n• **Target Structure:** Offer a 'Buy 1, Get 1 at Half Price' deal.\n• **Why:** Effectively sells 2 units at **₦{(selling_price * 1.5):,.2f}**, doubling sales speed while preserving positive margins."
+        impact_analysis = f"Welcome to your risk breakdown! 👋 You currently have ₦{tied_capital:,.2f} in cash locked up in this product line. At your current sales rate ({daily_sales_velocity:.1f} units per day), it will take about {int(days_of_stock)} days to sell out naturally. Holding this inventory for so long will cause carrying fees, inflation, and opportunity costs to eat away ₦{carrying_cost_exposure:,.2f} of your capital."
+        opt_conservative = f"**Option 1: Controlled Clearance Promotion**\n\n• **Target Price:** ₦{breakeven_clearance:,.2f} per unit (2% above cost price).\n• **Cash Recovery:** Recovers ₦{(breakeven_clearance * current_stock):,.2f} in liquid cash within 14 days.\n• **Why:** Safely liquidates slow stock without taking a net loss."
+        opt_aggressive = f"**Option 2: Wholesale B2B Cash Offload**\n\n• **Target Volume:** Sell {half_stock_units:,} units (50% of stock) at cost price (₦{purchase_price:,.2f}/unit).\n• **Cash Recovery:** Unlocks ₦{(half_stock_units * purchase_price):,.2f} instantly.\n• **Why:** Provides immediate cash to buy faster-moving inventory."
+        opt_creative = f"**Option 3: Buy 1, Get 1 at 50% Off Bundle**\n\n• **Target Structure:** Offer a 'Buy 1, Get 1 at Half Price' deal.\n• **Why:** Effectively sells 2 units at ₦{(selling_price * 1.5):,.2f}, doubling sales speed while preserving positive margins."
 
     elif irvs_score >= 40:
         status = "🟡 MODERATE RISK (VELOCITY SLOWDOWN)"
-        impact_analysis = (
-            f"Hi there! 👋 Your inventory velocity is running slightly slower than optimal cycles, with **~{int(days_of_stock)} days of stock** remaining. "
-            f"While you are making profit on sales, you have **₦{tied_capital:,.2f}** tied up that could be earning faster returns elsewhere."
-        )
+        impact_analysis = f"Hi there! 👋 Your inventory velocity is running slightly slower than optimal cycles, with ~{int(days_of_stock)} days of stock remaining. While you are making profit on sales, you have ₦{tied_capital:,.2f} tied up that could be earning faster returns elsewhere."
         opt_conservative = "**Option 1: Pause Purchase Orders**\n\n• **Action:** Freeze new stock replenishment until remaining coverage drops below 25 days.\n• **Why:** Allows existing stock to clear naturally before committing fresh cash."
         opt_aggressive = "**Option 2: Flash Promotion Boost**\n\n• **Action:** Launch a temporary 10% discount or offer free delivery.\n• **Why:** Re-engages buyers and accelerates daily turnover."
         opt_creative = "**Option 3: Checkout Add-On Feature**\n\n• **Action:** Offer this item as a recommended add-on for customer purchases over ₦50,000.\n• **Why:** Boosts average basket sizes without requiring broad discount campaigns."
 
     else:
         status = "🟢 HEALTHY CAPITAL EFFICIENCY"
-        impact_analysis = (
-            f"Great news! 🎉 This product line is performing brilliantly with a solid **{gross_margin_pct:.1f}% profit margin** "
-            f"and a healthy inventory buffer of **~{int(days_of_stock)} days of supply**."
-        )
+        impact_analysis = f"Great news! 🎉 This product line is performing brilliantly with a solid {gross_margin_pct:.1f}% profit margin and a healthy inventory buffer of ~{int(days_of_stock)} days of supply."
         opt_conservative = "**Option 1: Maintain Order Schedules**\n\n• **Action:** Continue standard reorder routines based on steady customer demand."
         opt_aggressive = "**Option 2: Bulk Purchase Discount Negotiation**\n\n• **Action:** Leverage your high sales speed to ask your supplier for a 5% volume discount on the next batch."
         opt_creative = "**Option 3: VIP Loyalty Pre-Access**\n\n• **Action:** Offer early stock access and exclusive bundles to top repeat buyers."
@@ -222,7 +195,6 @@ with tab1:
         analysis_period = st.number_input("Analysis Window (Days)", min_value=1, value=30)
 
     moniepoint_sales = get_moniepoint_sales_summary(st.session_state.client_id, p_name, days_window=analysis_period)
-    
     st.info(f"⚡ **Moniepoint POS Sync:** Recorded **{moniepoint_sales} units sold** via POS over the last {analysis_period} days.")
 
     if st.button("Run Comprehensive Risk Audit"):
@@ -269,12 +241,8 @@ with tab1:
 # TAB 2: LOGBOOK ANALYSIS & THEFT DETECTION ENGINE
 with tab2:
     st.subheader("🕵️ Daily Logbook Audit & Theft Detection Engine")
-    st.write(
-        "Upload your store's daily sales logbook (CSV or Excel) to compare staff sales logs against expected inventory levels "
-        "and payment records. LossGuard will instantly scan for unauthorized discounts, missing stock, and payment discrepancies."
-    )
-    
-    st.caption("Expected file columns: `Date`, `Product`, `Expected_Price`, `Sold_Price`, `Units_Logged`, `POS_Recorded_Units`")
+    st.write("Upload your store daily sales logbook (CSV or Excel) to compare staff sales logs against expected inventory levels and payment records. LossGuard will instantly scan for unauthorized discounts, missing stock, and payment discrepancies.")
+    st.caption("Expected file columns: Date, Product, Expected_Price, Sold_Price, Units_Logged, POS_Recorded_Units")
     
     uploaded_logbook = st.file_uploader("Upload Daily Store Logbook", type=["csv", "xlsx"])
     
@@ -358,10 +326,7 @@ with tab3:
 
     st.write("### Recorded Moniepoint Transactions")
     conn = sqlite3.connect(DB_NAME)
-    tx_df = pd.read_sql_query(
-        "SELECT timestamp, transaction_ref, product_name, units_sold, amount_paid FROM moniepoint_transactions WHERE client_id = ? ORDER BY timestamp DESC", 
-        conn, params=(st.session_state.client_id,)
-    )
+    tx_df = pd.read_sql_query("SELECT timestamp, transaction_ref, product_name, units_sold, amount_paid FROM moniepoint_transactions WHERE client_id = ? ORDER BY timestamp DESC", conn, params=(st.session_state.client_id,))
     conn.close()
     
     if not tx_df.empty:
@@ -378,4 +343,4 @@ with tab4:
         csv_history = history_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Audit Stream (CSV)", csv_history, "audit_history.csv", "text/csv")
     else:
-        st.info("No recorded
+        st.info("No recorded logs found in this workspace. Run an audit to populate history.")
