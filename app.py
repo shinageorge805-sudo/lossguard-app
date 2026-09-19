@@ -88,6 +88,7 @@ def get_client_audits(client_id):
     conn.close()
     return df
 
+# Initialize DB on load
 init_db()
 
 # ==========================================
@@ -287,7 +288,6 @@ with tab2:
             req_log_cols = ['Date', 'Product', 'Expected_Price', 'Sold_Price', 'Units_Logged', 'POS_Recorded_Units']
             
             if all(col in log_df.columns for col in req_log_cols):
-                # Calculations for discrepancies
                 log_df['Price_Discrepancy'] = log_df['Expected_Price'] - log_df['Sold_Price']
                 log_df['Stock_Shrinkage_Units'] = log_df['Units_Logged'] - log_df['POS_Recorded_Units']
                 log_df['Estimated_Theft_Loss_NGN'] = (log_df['Price_Discrepancy'] * log_df['Units_Logged']) + (log_df['Stock_Shrinkage_Units'] * log_df['Expected_Price'])
@@ -299,7 +299,7 @@ with tab2:
                 st.subheader("🚨 Theft & Discrepancy Findings Summary")
                 
                 c1, c2, c3 = st.columns(3)
-                c1.metric("🚩 Total Flagged Incidents", f"{len(flagged_records)} Days / Transactions")
+                c1.metric("🚩 Total Flagged Incidents", f"{len(flagged_records)} Transactions")
                 c2.metric("💸 Total Estimated Financial Loss", f"₦{total_loss:,.2f}")
                 c3.metric("📦 Unaccounted Stock Shrinkage", f"{log_df['Stock_Shrinkage_Units'].sum():,} Units")
                 
@@ -319,26 +319,25 @@ with tab2:
                 st.download_button("📥 Export Discrepancy Report (CSV)", csv_report, "lossguard_theft_audit.csv", "text/csv")
                 
             else:
-                st.error(f"File formatting error. Please make sure your logbook includes these exact headers: {', '.join(req_log_cols)}")
+                st.error(f"File formatting error. Required headers are: {', '.join(req_log_cols)}")
         except Exception as e:
             st.error(f"Error analyzing logbook file: {e}")
             
     st.write("---")
-    st.write("### 📝 Download Sample Logbook Template")
-    st.write("Need a template to test? Copy this structure or generate a quick CSV:")
+    st.write("### 📝 Sample Logbook Format")
     
     sample_data = pd.DataFrame({
         "Date": ["2026-03-01", "2026-03-02", "2026-03-03"],
         "Product": ["Engine Oil 5L", "Brake Pads", "Car Battery"],
         "Expected_Price": [30000, 15000, 65000],
-        "Sold_Price": [30000, 12000, 65000], # Price discrepancy on Brake Pads
+        "Sold_Price": [30000, 12000, 65000],
         "Units_Logged": [10, 5, 2],
-        "POS_Recorded_Units": [10, 5, 1] # Shrinkage discrepancy on Car Battery
+        "POS_Recorded_Units": [10, 5, 1]
     })
     
     st.dataframe(sample_data, use_container_width=True)
     sample_csv = sample_data.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Sample Logbook Template", sample_csv, "sample_store_logbook.csv", "text/csv")
+    st.download_button("📥 Download Sample Logbook Template (CSV)", sample_csv, "sample_store_logbook.csv", "text/csv")
 
 # TAB 3: MONIEPOINT WEBHOOK TESTER
 with tab3:
@@ -375,4 +374,8 @@ with tab4:
     st.subheader(f"Historical Audit Stream for {st.session_state.client_id}")
     history_df = get_client_audits(st.session_state.client_id)
     if not history_df.empty:
-        st.dataframe(history_df, use_co
+        st.dataframe(history_df, use_container_width=True)
+        csv_history = history_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Audit Stream (CSV)", csv_history, "audit_history.csv", "text/csv")
+    else:
+        st.info("No recorded
