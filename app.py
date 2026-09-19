@@ -19,7 +19,6 @@ Unchecked inventory and POS\n"
         font=font_footer,
         fill=(200, 200, 200, 255),
         anchor="mm",
-# Run functionimport streamlit as st
 import pandas as pd
 import sqlite3
 import hmac
