@@ -1,4 +1,25 @@
-import streamlit as st
+Unchecked inventory and POS\n"
+        "mismatches cost retail stores\n"
+        "thousands every month."
+    )
+    draw.multiline_text(
+        (width // 2, int(height * 0.83)),
+        body_text,
+        font=font_body,
+        fill=(240, 240, 240, 255),
+        align="center",
+        anchor="mm",
+    )
+
+    # --- 3. Footer Call To Action ---
+    footer_text = "(Tap to see how to fix it ➡️)"
+    draw.text(
+        (width // 2, int(height * 0.94)),
+        footer_text,
+        font=font_footer,
+        fill=(200, 200, 200, 255),
+        anchor="mm",
+# Run functionimport streamlit as st
 import pandas as pd
 import sqlite3
 import hmac
